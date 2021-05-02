@@ -1,6 +1,7 @@
 # XNodePluginOrder
 A data-oriented sorting order plugin for xNode.<br>
 Change paths and add-node menu order without changing sourcecode.
+![Example](https://github.com/nostek/XNodePluginOrder/blob/main/Order.png)
 
 ### Installation:
 In your CustomNodeGraphEditor cs file override these functions.
