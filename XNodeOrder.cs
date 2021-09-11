@@ -75,7 +75,17 @@ namespace XNodeEditor
 		const string PropertyType = "Type";
 		const string PropertyPath = "Path";
 
+		class Data
+		{
+			public Type type;
+			public string path;
+			public string defaultName;
+			public string defaultMenuName;
+		}
+
 		ReorderableList list = null;
+
+		Dictionary<int, Data> cache = new Dictionary<int, Data>();
 
 		void OnEnable()
 		{
@@ -93,35 +103,66 @@ namespace XNodeEditor
 					if (prop.arraySize == 0)
 						return;
 
-					var element = prop.GetArrayElementAtIndex(index);
-					if (element == null)
-						return;
+					if (!cache.TryGetValue(index, out var data))
+					{
+						var element = prop.GetArrayElementAtIndex(index);
+						if (element == null)
+							return;
 
-					element.isExpanded = true;
+						var ptype = element.FindPropertyRelative(PropertyType);
+						var ppath = element.FindPropertyRelative(PropertyPath);
 
-					var ptype = element.FindPropertyRelative(PropertyType);
-					var ppath = element.FindPropertyRelative(PropertyPath);
+						var type = Type.GetType(ptype.stringValue);
+						var defaultName = NodeEditorUtilities.NodeDefaultName(type);
+						var defaultMenuName = GetNodeMenuName(type);
+
+						data = new Data()
+						{
+							type = type,
+							path = ppath.stringValue,
+							defaultName = defaultName,
+							defaultMenuName = defaultMenuName
+						};
+
+						cache.Add(index, data);
+					}
 
 					float w = rect.width / 3f;
 
-					var type = Type.GetType(ptype.stringValue);
-					EditorGUI.SelectableLabel(new Rect(rect.x, rect.y, w, rect.height), NodeEditorUtilities.NodeDefaultName(type));
+					EditorGUI.SelectableLabel(new Rect(rect.x, rect.y, w, rect.height), data.defaultName);
 
-					var fallback = GetNodeMenuName(type);
+					string setpath = null;
 
-					if (string.IsNullOrEmpty(ppath.stringValue))
+					if (string.IsNullOrEmpty(data.path))
 					{
-						var newpath = EditorGUI.TextField(new Rect(rect.x + w, rect.y, w + w, rect.height), fallback);
-						if (newpath != fallback)
-							ppath.stringValue = newpath;
+						var newpath = EditorGUI.TextField(new Rect(rect.x + w, rect.y, w + w, rect.height), data.defaultMenuName);
+						if (newpath == data.defaultMenuName)
+						{
+							//nothing
+						}
+						else if (newpath != data.defaultMenuName)
+							setpath = newpath;
 					}
 					else
 					{
-						var newpath = EditorGUI.TextField(new Rect(rect.x + w, rect.y, w + w, rect.height), ppath.stringValue);
-						if (newpath == fallback)
-							ppath.stringValue = "";
+						var newpath = EditorGUI.TextField(new Rect(rect.x + w, rect.y, w + w, rect.height), data.path);
+						if (newpath == data.path)
+						{
+							//nothing
+						}
+						else if (newpath == data.defaultMenuName)
+							setpath = "";
 						else
-							ppath.stringValue = newpath;
+							setpath = newpath;
+					}
+
+					if (setpath != null)
+					{
+						var element = prop.GetArrayElementAtIndex(index);
+						var ppath = element.FindPropertyRelative(PropertyPath);
+						ppath.stringValue = setpath;
+
+						data.path = setpath;
 					}
 				},
 				elementHeightCallback = (index) =>
@@ -129,6 +170,7 @@ namespace XNodeEditor
 					return EditorGUIUtility.singleLineHeight;
 				}
 			};
+			list.onReorderCallback += (index) => cache.Clear();
 		}
 
 		public override void OnInspectorGUI()
